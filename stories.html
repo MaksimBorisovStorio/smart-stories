@@ -108,7 +108,7 @@
     justify-content: center;
     margin-top: 8px;
     padding-bottom: 140px;
-    perspective: 1100px;
+    perspective: 650px;
     perspective-origin: 50% 50%;
   }
   .carousel {
@@ -1690,12 +1690,13 @@
     let listening = false;
     let ticking = false;
 
-    const MAX_RY = 14;                // deg, left/right tilt clamp
-    const MAX_RX = 9;                 // deg, forward/back tilt clamp
-    const ACTIVE_AMP = 1.5;           // active card tilts more
-    const NEIGHBOR_AMP = 0.7;
-    const LERP = 0.12;
+    const MAX_RY = 28;                // deg, left/right tilt clamp
+    const MAX_RX = 20;                // deg, forward/back tilt clamp
+    const ACTIVE_AMP = 1.6;           // active card tilts more
+    const NEIGHBOR_AMP = 0.9;
+    const LERP = 0.18;
     const NEUTRAL_BETA = 35;          // assumed phone-holding angle
+    const INPUT_GAIN = 0.7;           // how strongly raw degrees map to card rotation
 
     function onOrientation(e) {
       state.events++;
@@ -1753,8 +1754,8 @@
       curG += (latestG - curG) * LERP;
       curB += (latestB - curB) * LERP;
       if (!viewStories.hidden) {
-        const ry = Math.max(-MAX_RY, Math.min(MAX_RY,  curG * 0.35));
-        const rx = Math.max(-MAX_RX, Math.min(MAX_RX, -curB * 0.35));
+        const ry = Math.max(-MAX_RY, Math.min(MAX_RY,  curG * INPUT_GAIN));
+        const rx = Math.max(-MAX_RX, Math.min(MAX_RX, -curB * INPUT_GAIN));
         cardEls.forEach((el, i) => {
           const amp = (i === lastActiveIdx) ? ACTIVE_AMP : NEIGHBOR_AMP;
           el.style.setProperty("--ry", (ry * amp).toFixed(2) + "deg");
