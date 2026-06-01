@@ -55,8 +55,10 @@
     position: absolute;
     top: 0;
     left: 50%;
-    width: 460px;
-    height: 720px;
+    width: 540px;
+    height: 780px;
+    /* Pull top edge above the viewport so the blur's faded edge is
+       off-screen and the status-bar area gets solid halo color. */
     transform: translate(-50%, -120px);
     z-index: 0;
     pointer-events: none;
@@ -717,15 +719,16 @@
 <!-- ============== VIEW: STORIES (carousel) ============== -->
 <div class="view view-stories" id="viewStories">
   <div class="phone">
-    <div class="header">
-      <h1>Smart Stories</h1>
+    <!-- Halo lives at .phone level so it can extend all the way up
+         under the status bar, behind the (now empty) header. -->
+    <div class="card-bg-stack">
+      <div class="card-bg" id="bgA"></div>
+      <div class="card-bg" id="bgB"></div>
     </div>
 
+    <div class="header"></div>
+
     <div class="carousel-wrap">
-      <div class="card-bg-stack">
-        <div class="card-bg" id="bgA"></div>
-        <div class="card-bg" id="bgB"></div>
-      </div>
       <div class="carousel" id="carousel"></div>
     </div>
 
