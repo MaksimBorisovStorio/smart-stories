@@ -143,12 +143,38 @@
     scale: 0.93;
     --ry: 0deg;
     --rx: 0deg;
+    --glow-x: 50%;
+    --glow-y: 50%;
+    --glow-strength: 0;
     transform: rotateY(var(--ry)) rotateX(var(--rx));
     will-change: transform, scale;
     color: inherit;
     text-decoration: none;
   }
   .card.active { scale: 1; }
+
+  /* Holographic sheen — diagonal sweep of transparent white that
+     shifts position as the phone tilts. */
+  .card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    pointer-events: none;
+    border-radius: var(--radius);
+    background: linear-gradient(
+      115deg,
+      transparent 30%,
+      rgba(255,255,255,0.55) 48%,
+      rgba(255,255,255,0.20) 54%,
+      transparent 70%
+    );
+    background-size: 260% 260%;
+    background-position: var(--glow-x) var(--glow-y);
+    mix-blend-mode: screen;
+    opacity: var(--glow-strength);
+    transition: opacity 0.25s ease;
+  }
   .card img {
     width: 100%;
     height: 100%;
@@ -1690,13 +1716,13 @@
     let listening = false;
     let ticking = false;
 
-    const MAX_RY = 28;                // deg, left/right tilt clamp
-    const MAX_RX = 20;                // deg, forward/back tilt clamp
-    const ACTIVE_AMP = 1.6;           // active card tilts more
-    const NEIGHBOR_AMP = 0.9;
-    const LERP = 0.18;
+    const MAX_RY = 35;                // deg, left/right tilt clamp
+    const MAX_RX = 25;                // deg, forward/back tilt clamp
+    const ACTIVE_AMP = 1.8;           // active card tilts more
+    const NEIGHBOR_AMP = 1.0;
+    const LERP = 0.22;
     const NEUTRAL_BETA = 35;          // assumed phone-holding angle
-    const INPUT_GAIN = 0.7;           // how strongly raw degrees map to card rotation
+    const INPUT_GAIN = 1.0;           // how strongly raw degrees map to card rotation
 
     function onOrientation(e) {
       state.events++;
@@ -1754,12 +1780,22 @@
       curG += (latestG - curG) * LERP;
       curB += (latestB - curB) * LERP;
       if (!viewStories.hidden) {
-        const ry = Math.max(-MAX_RY, Math.min(MAX_RY,  curG * INPUT_GAIN));
-        const rx = Math.max(-MAX_RX, Math.min(MAX_RX, -curB * INPUT_GAIN));
+        // Flipped signs so cards rotate to follow the phone's facing direction.
+        const ry = Math.max(-MAX_RY, Math.min(MAX_RY, -curG * INPUT_GAIN));
+        const rx = Math.max(-MAX_RX, Math.min(MAX_RX,  curB * INPUT_GAIN));
+        // Sheen position: 0..100%. Sweeps left→right as gamma goes +→-,
+        // up→down as beta goes -→+. Subtract from 50% so the bright band
+        // slides opposite to the tilt direction (matches Apple-style parallax).
+        const gxPct = 50 - (curG * 1.2);  // wider sweep than the rotation
+        const gyPct = 50 + (curB * 0.6);
+        const strength = Math.min(1, (Math.abs(curG) + Math.abs(curB) * 0.6) / 30);
         cardEls.forEach((el, i) => {
           const amp = (i === lastActiveIdx) ? ACTIVE_AMP : NEIGHBOR_AMP;
           el.style.setProperty("--ry", (ry * amp).toFixed(2) + "deg");
           el.style.setProperty("--rx", (rx * amp).toFixed(2) + "deg");
+          el.style.setProperty("--glow-x", gxPct.toFixed(1) + "%");
+          el.style.setProperty("--glow-y", gyPct.toFixed(1) + "%");
+          el.style.setProperty("--glow-strength", strength.toFixed(2));
         });
       }
       requestAnimationFrame(tick);
