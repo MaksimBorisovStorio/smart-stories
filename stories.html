@@ -135,21 +135,23 @@
     scroll-snap-align: center;
     scroll-snap-stop: always;
     position: relative;
-    transition: scale 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
     cursor: pointer;
     background: #ddd;
-    scale: 0.93;
     --ry: 0deg;
     --rx: 0deg;
+    --sc: 0.93;
     --glow-x: 50%;
     --glow-y: 50%;
     --glow-strength: 0;
-    transform: perspective(650px) rotateY(var(--ry)) rotateX(var(--rx));
-    will-change: transform, scale;
+    /* All transforms in one chain so perspective() actually applies to the rotations. */
+    transform: perspective(500px) rotateY(var(--ry)) rotateX(var(--rx)) scale(var(--sc));
+    transform-style: preserve-3d;
+    backface-visibility: hidden;
+    will-change: transform;
     color: inherit;
     text-decoration: none;
   }
-  .card.active { scale: 1; }
+  .card.active { --sc: 1; }
 
   /* Holographic sheen — diagonal sweep of transparent white that
      shifts position as the phone tilts. */
@@ -1714,13 +1716,13 @@
     let listening = false;
     let ticking = false;
 
-    const MAX_RY = 26;                // deg, left/right tilt clamp
-    const MAX_RX = 18;                // deg, forward/back tilt clamp
-    const ACTIVE_AMP = 1.5;           // active card tilts more
-    const NEIGHBOR_AMP = 0.8;
-    const LERP = 0.18;
+    const MAX_RY = 22;                // deg, left/right tilt clamp
+    const MAX_RX = 15;                // deg, forward/back tilt clamp
+    const ACTIVE_AMP = 1.4;           // active card tilts more
+    const NEIGHBOR_AMP = 0.7;
+    const LERP = 0.15;
     const NEUTRAL_BETA = 35;          // assumed phone-holding angle
-    const INPUT_GAIN = 0.7;           // how strongly raw degrees map to card rotation
+    const INPUT_GAIN = 0.4;           // how strongly raw degrees map to card rotation
 
     function onOrientation(e) {
       state.events++;
