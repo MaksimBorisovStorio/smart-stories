@@ -52,14 +52,14 @@
 
   /* Card-shaped blurred backdrop (crossfade per active card) */
   .view-stories .card-bg-stack {
-    position: absolute;
+    /* Fixed to viewport so it can't shift with overscroll/address-bar quirks.
+       The blur's faded top edge is pulled well off-screen. */
+    position: fixed;
     top: 0;
     left: 50%;
     width: 540px;
-    height: 780px;
-    /* Pull top edge above the viewport so the blur's faded edge is
-       off-screen and the status-bar area gets solid halo color. */
-    transform: translate(-50%, -120px);
+    height: 820px;
+    transform: translate(-50%, -180px);
     z-index: 0;
     pointer-events: none;
     overflow: visible;
