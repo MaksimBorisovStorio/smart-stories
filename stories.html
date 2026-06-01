@@ -1643,7 +1643,46 @@
      won't fire over plain http:// from a LAN IP.
      ==================================================================== */
   (function setupGyroTilt() {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const DEBUG = /[?#]debug\b/.test(location.href);
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    // Debug panel — opt-in via ?debug or #debug in the URL.
+    let dbg = null;
+    if (DEBUG) {
+      dbg = document.createElement("div");
+      dbg.style.cssText =
+        "position:fixed;left:8px;right:8px;bottom:calc(70px + env(safe-area-inset-bottom));" +
+        "z-index:9999;background:rgba(0,0,0,0.85);color:#fff;font:11px/1.4 monospace;" +
+        "padding:8px 10px;border-radius:8px;white-space:pre;pointer-events:none;";
+      document.body.appendChild(dbg);
+    }
+    const state = {
+      ua: (navigator.userAgent || "").slice(0, 80),
+      secure: window.isSecureContext,
+      reduceMotion: reduceMotion,
+      DOE: typeof window.DeviceOrientationEvent,
+      reqPerm: typeof (window.DeviceOrientationEvent && DeviceOrientationEvent.requestPermission),
+      attempted: false,
+      permState: "(none)",
+      listening: false,
+      events: 0,
+      lastG: 0,
+      lastB: 0,
+    };
+    function paint() {
+      if (!dbg) return;
+      dbg.textContent =
+        "UA: " + state.ua +
+        "\nsecure=" + state.secure +
+        "  reduceMotion=" + state.reduceMotion +
+        "\nDOE=" + state.DOE + "  requestPermission=" + state.reqPerm +
+        "\npermAttempted=" + state.attempted + "  permState=" + state.permState +
+        "\nlistening=" + state.listening + "  events=" + state.events +
+        "\nlast gamma=" + state.lastG.toFixed(2) + "  beta=" + state.lastB.toFixed(2);
+    }
+    paint();
+
+    if (reduceMotion && !DEBUG) return;
 
     let latestG = 0, latestB = 0;     // most-recent gamma/beta from sensor
     let curG = 0, curB = 0;           // lerped values
@@ -1658,15 +1697,21 @@
     const NEUTRAL_BETA = 35;          // assumed phone-holding angle
 
     function onOrientation(e) {
-      if (e.gamma == null || e.beta == null) return;
+      state.events++;
+      if (e.gamma == null || e.beta == null) { paint(); return; }
       latestG = e.gamma;
       latestB = e.beta - NEUTRAL_BETA;
+      state.lastG = e.gamma;
+      state.lastB = e.beta;
+      paint();
       if (!ticking) { ticking = true; requestAnimationFrame(tick); }
     }
 
     function attachOrientation() {
       if (listening) return;
       listening = true;
+      state.listening = true;
+      paint();
       window.addEventListener("deviceorientation", onOrientation, { passive: true });
     }
 
@@ -1681,16 +1726,24 @@
         return;
       }
       requestingPermission = true;
+      state.attempted = true;
+      paint();
       req()
-        .then(state => {
-          if (state === "granted") {
+        .then(result => {
+          state.permState = result;
+          paint();
+          if (result === "granted") {
             attachOrientation();
             document.removeEventListener("click", maybeRequestPermission, true);
           } else {
             requestingPermission = false; // allow retry on next click
           }
         })
-        .catch(() => { requestingPermission = false; });
+        .catch(err => {
+          state.permState = "error:" + (err && err.message || err);
+          paint();
+          requestingPermission = false;
+        });
     }
     // Capture-phase listener fires before page handlers' preventDefault
     document.addEventListener("click", maybeRequestPermission, true);
