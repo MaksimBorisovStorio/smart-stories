@@ -1621,14 +1621,15 @@
   });
 
   // Initial state — based on URL hash
+  const baseUrl = location.pathname + location.search;
   if (location.hash === "#album") {
     // Seed history so back gesture lands on stories instead of leaving the PWA
-    history.replaceState({ view: "stories" }, "", location.pathname);
-    history.pushState({ view: "album" }, "", "#album");
+    history.replaceState({ view: "stories" }, "", baseUrl);
+    history.pushState({ view: "album" }, "", baseUrl + "#album");
     viewStories.hidden = true;
     viewAlbum.hidden = false;
   } else {
-    history.replaceState({ view: "stories" }, "", location.pathname);
+    history.replaceState({ view: "stories" }, "", baseUrl);
   }
 
   // Initial paint
