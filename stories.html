@@ -1670,12 +1670,30 @@
       window.addEventListener("deviceorientation", onOrientation, { passive: true });
     }
 
+    let requestingPermission = false;
     function maybeRequestPermission() {
+      if (listening || requestingPermission) return;
       const req = window.DeviceOrientationEvent && DeviceOrientationEvent.requestPermission;
-      if (typeof req !== "function") { attachOrientation(); return; }
-      req().then(state => { if (state === "granted") attachOrientation(); }).catch(() => {});
+      if (typeof req !== "function") {
+        // Android / desktop / older iOS — no permission needed
+        attachOrientation();
+        document.removeEventListener("click", maybeRequestPermission, true);
+        return;
+      }
+      requestingPermission = true;
+      req()
+        .then(state => {
+          if (state === "granted") {
+            attachOrientation();
+            document.removeEventListener("click", maybeRequestPermission, true);
+          } else {
+            requestingPermission = false; // allow retry on next click
+          }
+        })
+        .catch(() => { requestingPermission = false; });
     }
-    carousel.addEventListener("pointerdown", maybeRequestPermission, { once: true });
+    // Capture-phase listener fires before page handlers' preventDefault
+    document.addEventListener("click", maybeRequestPermission, true);
 
     function tick() {
       curG += (latestG - curG) * LERP;
