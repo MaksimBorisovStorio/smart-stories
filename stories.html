@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="Smart Stories" />
 <title>Smart Stories</title>
 <style>
@@ -45,9 +45,7 @@
   .view-stories .phone {
     display: flex;
     flex-direction: column;
-    /* Fade phone bg to transparent at the very top so the blurred halo
-       can show through behind the status bar. */
-    background: linear-gradient(to bottom, transparent 0, transparent 30px, var(--bg) 120px);
+    background: transparent;
   }
 
   /* Card-shaped blurred backdrop (crossfade per active card) */
