@@ -1,0 +1,4 @@
+.DS_Store
+*.pem
+serve_https.py
+.claude/

@@ -1,0 +1,1697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="Smart Stories" />
+<title>Smart Stories</title>
+<style>
+  /* ===== Shared globals ===== */
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: #ececec;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    color: #1a1a1a;
+    -webkit-font-smoothing: antialiased;
+    scroll-behavior: smooth;
+  }
+
+  /* Shared .phone wrapper (the device-frame container in each view) */
+  .phone {
+    max-width: 414px;
+    margin: 0 auto;
+    min-height: 100vh;
+    background: var(--bg);
+    box-shadow: 0 0 40px rgba(0,0,0,0.08);
+    position: relative;
+    overflow-x: clip;
+  }
+  @media (max-width: 480px) {
+    html, body { background: #f4f4f4; }
+    .phone { max-width: none; box-shadow: none; }
+  }
+
+  /* ===== STORIES VIEW (carousel) ===== */
+  .view-stories {
+    --bg: #f4f4f4;
+    --accent: #007377;
+    --radius: 24px;
+  }
+  .view-stories .phone {
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Card-shaped blurred backdrop (crossfade per active card) */
+  .view-stories .card-bg-stack {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 340px;
+    height: 500px;
+    transform: translate(-50%, calc(-50% - 70px));
+    z-index: 0;
+    pointer-events: none;
+    overflow: visible;
+  }
+  .view-stories .card-bg {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+    border-radius: 28px;
+    filter: blur(80px) saturate(1.4);
+    transform: scale(1.2);
+    opacity: 0;
+    transition: opacity 0.55s ease;
+    will-change: opacity, filter;
+  }
+  .view-stories .card-bg.active { opacity: 1; }
+  .view-stories .card-bg-stack::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 28px;
+    background: rgba(0, 0, 0, 0.30);
+    transform: scale(1.2);
+    filter: blur(80px);
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  /* Header */
+  .view-stories .header {
+    position: relative;
+    z-index: 10;
+    padding-top: max(14px, env(safe-area-inset-top));
+    padding-bottom: 14px;
+    text-align: center;
+  }
+  .view-stories .header h1 {
+    margin: 8px 0 0;
+    font-size: 17px;
+    font-weight: 600;
+  }
+
+  /* Carousel */
+  .carousel-wrap {
+    position: relative;
+    z-index: 5;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 8px;
+    padding-bottom: 140px;
+    perspective: 1100px;
+    perspective-origin: 50% 50%;
+  }
+  .carousel {
+    width: 100%;
+    overflow-x: auto;
+    overflow-y: visible;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    display: flex;
+    align-items: center;
+    gap: 22px;
+    padding: 24px calc(50% - 155px);
+    scroll-padding-inline: calc(50% - 155px);
+    position: relative;
+    z-index: 2;
+  }
+  .carousel::-webkit-scrollbar { display: none; }
+
+  .card {
+    flex: 0 0 310px;
+    width: 310px;
+    aspect-ratio: 310 / 465;
+    border-radius: var(--radius);
+    overflow: hidden;
+    scroll-snap-align: center;
+    scroll-snap-stop: always;
+    position: relative;
+    transition: scale 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+    cursor: pointer;
+    background: #ddd;
+    scale: 0.93;
+    --ry: 0deg;
+    --rx: 0deg;
+    transform: rotateY(var(--ry)) rotateX(var(--rx));
+    will-change: transform, scale;
+    color: inherit;
+    text-decoration: none;
+  }
+  .card.active { scale: 1; }
+  .card img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    border-radius: var(--radius);
+    pointer-events: none;
+    user-select: none;
+    -webkit-user-drag: none;
+  }
+  .card::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: var(--radius);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.2);
+    pointer-events: none;
+  }
+
+  /* Bottom tab bar */
+  .tab-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 30;
+    display: flex;
+    background: rgba(255,255,255,0.96);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    padding-bottom: max(10px, env(safe-area-inset-bottom));
+    border-top: 1px solid rgba(0,0,0,0.06);
+  }
+  @media (min-width: 481px) {
+    .tab-bar {
+      max-width: 414px;
+      left: 50%;
+      right: auto;
+      transform: translateX(-50%);
+    }
+  }
+  .tab {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    color: #333;
+    text-decoration: none;
+    font-size: 11px;
+    font-weight: 500;
+    position: relative;
+    padding-top: 18px;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .tab img { width: 24px; height: 24px; display: block; pointer-events: none; }
+  .tab.active { color: var(--accent); font-weight: 600; }
+  .tab.active::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 28px;
+    height: 2px;
+    background: var(--accent);
+    border-radius: 2px;
+  }
+
+  /* ===== ALBUM VIEW (Trip to Berlin) ===== */
+  .view-album {
+    --bg: #f9f9f9;
+    --text: #1a1a1a;
+    --muted: #8a8a8e;
+    --accent: #1f7a6b;
+    --photo-shadow: 0 4px 14px rgba(0,0,0,0.10);
+    --stack-shadow: 0 6px 16px rgba(0,0,0,0.10);
+    --radius: 10px;
+  }
+
+  /* Sticky header */
+  .view-album .header {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: rgba(249,249,249,0.92);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .app-nav {
+    padding: 8px 16px 12px;
+    display: grid;
+    grid-template-columns: 40px 1fr 40px;
+    align-items: center;
+  }
+  .app-nav .back, .app-nav .add {
+    width: 40px; height: 40px;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--accent);
+    cursor: pointer;
+  }
+  .app-nav .title {
+    text-align: center;
+    font-size: 17px;
+    font-weight: 600;
+  }
+
+  .content { padding: 8px 18px 120px; }
+
+  .chapter { margin: 28px 0 36px; text-align: center; }
+  .chapter-title { font-size: 18px; font-weight: 700; margin: 0 0 4px; }
+  .chapter-meta { font-size: 13px; color: var(--muted); margin-bottom: 18px; }
+
+  .grid { display: grid; gap: 18px; margin: 0 4px; align-items: start; }
+  .grid.cols-1 { grid-template-columns: 1fr; }
+  .grid.cols-2 { grid-template-columns: 1fr 1fr; gap: 18px 16px; }
+  .grid.cols-3 { grid-template-columns: 1fr 1fr 1fr; gap: 14px 12px; }
+
+  .tile {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 6px 4px;
+    cursor: pointer;
+    will-change: transform;
+  }
+  .tile.is-stack { cursor: pointer; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .tile { transform: none !important; }
+  }
+
+  .tile .frame {
+    position: relative;
+    width: 92%;
+    transform-origin: center center;
+  }
+  .grid.cols-3 .tile .frame { width: 94%; }
+  .grid.cols-1 .tile .frame { width: 90%; }
+
+  .tile img.main {
+    width: 100%;
+    height: auto;
+    display: block;
+    border-radius: var(--radius);
+    box-shadow: var(--photo-shadow);
+    background: #eee;
+    position: relative;
+    z-index: 3;
+  }
+
+  .stack-layer {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: var(--radius);
+    box-shadow: var(--stack-shadow);
+    object-fit: cover;
+    z-index: 1;
+  }
+  .stack-layer.l1 { transform: rotate(5deg) translate(8px, 5px); z-index: 1; }
+  .stack-layer.l2 { transform: rotate(-4deg) translate(-7px, 8px); z-index: 2; }
+  .stack-layer.l3 { transform: rotate(7deg) translate(10px, -3px); z-index: 1; }
+
+  .stack-badge {
+    position: absolute;
+    top: -10px;
+    right: -10px;
+    min-width: 32px;
+    height: 32px;
+    padding: 0 9px;
+    background: #1c1c1e;
+    color: #fff;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+    z-index: 5;
+    transition: opacity 0.2s ease;
+  }
+
+  .tile-hide-btn {
+    position: absolute;
+    top: -10px;
+    right: -10px;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: #e53e3e;
+    color: #fff;
+    border: 2px solid #fff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+    z-index: 6;
+    opacity: 0;
+    transform: scale(0.6);
+    transition: opacity 0.18s ease, transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  body.edit-mode .tile-hide-btn {
+    opacity: 1;
+    transform: scale(1);
+    pointer-events: auto;
+  }
+  body.edit-mode .stack-badge { opacity: 0; pointer-events: none; }
+  body.edit-mode .view-album .header { filter: saturate(0.7); }
+
+  @keyframes tile-wiggle-a {
+    0%, 100% { transform: translate3d(0, 0.4px, 0) rotate(-0.7deg); }
+    50%      { transform: translate3d(0, -0.4px, 0) rotate(0.8deg); }
+  }
+  @keyframes tile-wiggle-b {
+    0%, 100% { transform: translate3d(0, -0.4px, 0) rotate(0.8deg); }
+    50%      { transform: translate3d(0, 0.4px, 0) rotate(-0.7deg); }
+  }
+  body.edit-mode .tile {
+    animation: tile-wiggle-a 0.29s ease-in-out infinite;
+    animation-delay: var(--wiggle-delay, 0s);
+    touch-action: none;
+  }
+  body.edit-mode .tile:nth-child(odd) { animation-name: tile-wiggle-b; }
+  body.edit-mode .tile.removing { animation: none; }
+
+  body.dragging .tile { animation-play-state: paused; }
+  .tile.dragging {
+    animation: none !important;
+    will-change: left, top;
+    z-index: 60;
+  }
+  .tile.dragging .frame {
+    transform: rotate(0deg) scale(1.06) !important;
+    transition: transform 0.18s ease, box-shadow 0.18s ease;
+    box-shadow: 0 22px 44px rgba(0,0,0,0.28), 0 6px 14px rgba(0,0,0,0.18);
+  }
+  .tile.dragging .tile-hide-btn { opacity: 0 !important; pointer-events: none; }
+  .tile-placeholder {
+    border: 2px dashed var(--accent);
+    border-radius: var(--radius);
+    background: rgba(31,122,107,0.07);
+    transition: min-height 0.18s ease;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .tile.dragging .frame { transition: none; }
+    .tile-placeholder { transition: none; }
+    body.edit-mode .tile { animation: none !important; }
+  }
+
+  .edit-banner {
+    position: fixed;
+    top: max(12px, env(safe-area-inset-top));
+    left: 50%;
+    transform: translateX(-50%) translateY(-80px);
+    background: #1c1c1e;
+    color: #fff;
+    border-radius: 999px;
+    padding: 10px 18px 10px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+    z-index: 30;
+    display: flex; align-items: center; gap: 8px;
+    opacity: 0;
+    transition: transform 0.3s cubic-bezier(0.34, 1.4, 0.64, 1), opacity 0.25s ease;
+    pointer-events: none;
+  }
+  body.edit-mode .edit-banner {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+  }
+
+  .tile.removing .frame {
+    opacity: 0;
+    transform: scale(0.6) rotate(var(--rot, 0deg)) !important;
+    transition: opacity 0.32s ease, transform 0.32s cubic-bezier(0.5, 0, 0.7, 0.4) !important;
+  }
+
+  .safe-bottom { height: 32px; }
+
+  .fab {
+    position: fixed;
+    left: 50%;
+    bottom: calc(20px + env(safe-area-inset-bottom));
+    transform: translateX(-50%);
+    z-index: 30;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 999px;
+    padding: 14px 22px 14px 18px;
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+    box-shadow: 0 10px 28px rgba(31,122,107,0.38), 0 2px 6px rgba(0,0,0,0.14);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform 0.22s cubic-bezier(0.34, 1.4, 0.64, 1),
+                opacity 0.2s ease,
+                box-shadow 0.2s ease;
+  }
+  .fab:active {
+    transform: translateX(-50%) scale(0.96);
+    box-shadow: 0 6px 16px rgba(31,122,107,0.3), 0 2px 4px rgba(0,0,0,0.1);
+  }
+  .fab svg { display: block; }
+
+  body.edit-mode .fab,
+  body:has(.overlay.open) .fab {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(-50%) translateY(24px);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .fab,
+    .fab:active,
+    body.edit-mode .fab,
+    body:has(.overlay.open) .fab {
+      transition: opacity 0.2s ease;
+      transform: translateX(-50%);
+    }
+  }
+
+  /* Lightbox overlay */
+  .overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15,15,15,0.55);
+    backdrop-filter: blur(22px) saturate(140%);
+    -webkit-backdrop-filter: blur(22px) saturate(140%);
+    z-index: 100;
+    display: none;
+    opacity: 0;
+    transition: opacity 0.28s ease;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+  .overlay.open { display: block; opacity: 1; }
+  .overlay-inner {
+    min-height: 100%;
+    box-sizing: border-box;
+    padding: 60px 18px 130px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+  }
+  .overlay-photos {
+    width: 100%;
+    max-width: 380px;
+    display: grid;
+    gap: 16px;
+  }
+  .overlay-photos.cols-1 { grid-template-columns: 1fr; }
+  .overlay-photos.cols-2 { grid-template-columns: 1fr 1fr; }
+  .overlay-photos.single {
+    max-width: 90vw;
+    grid-template-columns: 1fr;
+    justify-items: center;
+  }
+  .overlay-photos.single .overlay-photo { width: 100%; }
+  .overlay-photos.single .overlay-photo img {
+    max-height: 75vh;
+    width: auto;
+    max-width: 100%;
+    margin: 0 auto;
+  }
+  .overlay-photos.swiper {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    width: 100vw;
+    max-width: 100vw;
+    overflow-x: auto;
+    overflow-y: visible;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: 0;
+    padding: 0;
+    margin: 0;
+  }
+  .overlay-photos.swiper::-webkit-scrollbar { display: none; }
+  .overlay-photos.swiper .overlay-photo {
+    flex: 0 0 80vw;
+    max-width: 380px;
+    margin-right: 18px;
+    scroll-snap-align: center;
+    scroll-snap-stop: always;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .overlay-photos.swiper .overlay-photo:first-child { margin-left: 10vw; }
+  .overlay-photos.swiper .overlay-photo:last-child  { margin-right: 10vw; }
+  .overlay-photos.swiper .overlay-photo img {
+    width: 100%;
+    height: auto;
+    max-height: 70vh;
+    object-fit: contain;
+  }
+
+  .overlay-photo { position: relative; }
+  .overlay-photo-hide {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 36px;
+    height: 36px;
+    background: #e53e3e;
+    color: #fff;
+    border: 2px solid #fff;
+    border-radius: 50%;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    opacity: 0;
+    transform: scale(0.6);
+    transition: opacity 0.2s ease, transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+    pointer-events: none;
+    z-index: 8;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+  }
+  body.edit-mode .overlay-photo-hide {
+    opacity: 1;
+    transform: scale(1);
+    pointer-events: auto;
+  }
+  .overlay-photo.hiding {
+    transition: opacity 0.3s ease, transform 0.35s cubic-bezier(0.5, 0, 0.7, 0.4) !important;
+    opacity: 0 !important;
+    transform: scale(0.55) rotate(6deg) !important;
+    pointer-events: none;
+  }
+  .overlay-photo {
+    position: relative;
+    width: 100%;
+    transform-origin: center center;
+    opacity: 0;
+    transform: scale(0.7) translateY(40px) rotate(0deg);
+    transition: opacity 0.35s ease, transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .overlay-photo img {
+    width: 100%;
+    height: auto;
+    border-radius: var(--radius);
+    display: block;
+    box-shadow: 0 12px 36px rgba(0,0,0,0.35);
+  }
+  .overlay.open .overlay-photo {
+    opacity: 1;
+    transform: scale(1) translateY(0) rotate(var(--ovrot, 0deg));
+  }
+  .overlay.open .overlay-photo:nth-child(1) { transition-delay: 0.04s; }
+  .overlay.open .overlay-photo:nth-child(2) { transition-delay: 0.10s; }
+  .overlay.open .overlay-photo:nth-child(3) { transition-delay: 0.16s; }
+  .overlay.open .overlay-photo:nth-child(4) { transition-delay: 0.22s; }
+  .overlay.open .overlay-photo:nth-child(5) { transition-delay: 0.28s; }
+  .overlay.open .overlay-photo:nth-child(6) { transition-delay: 0.34s; }
+  .overlay.open .overlay-photo:nth-child(7) { transition-delay: 0.40s; }
+  .overlay.open .overlay-photo:nth-child(8) { transition-delay: 0.46s; }
+
+  .overlay-actions {
+    position: fixed;
+    bottom: max(24px, env(safe-area-inset-bottom));
+    left: 50%;
+    transform: translateX(-50%);
+    display: none;
+    flex-direction: row;
+    gap: 10px;
+    z-index: 110;
+  }
+  .overlay-actions.show { display: flex; }
+  .overlay-btn {
+    background: #ffffff;
+    color: #1a1a1a;
+    border: none;
+    padding: 12px 22px;
+    border-radius: 999px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .overlay-btn.secondary {
+    background: rgba(40,40,40,0.92);
+    color: #fff;
+    backdrop-filter: blur(10px);
+  }
+  .overlay-title {
+    color: #fff;
+    font-size: 15px;
+    font-weight: 600;
+    margin: 0 0 14px;
+    text-align: center;
+    opacity: 0.95;
+  }
+  .overlay-sub {
+    color: rgba(255,255,255,0.7);
+    font-size: 12px;
+    margin: 0 0 22px;
+    text-align: center;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .card, .bg-layer { transition: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ============== VIEW: STORIES (carousel) ============== -->
+<div class="view view-stories" id="viewStories">
+  <div class="phone">
+    <div class="header">
+      <h1>Smart Stories</h1>
+    </div>
+
+    <div class="carousel-wrap">
+      <div class="card-bg-stack">
+        <div class="card-bg" id="bgA"></div>
+        <div class="card-bg" id="bgB"></div>
+      </div>
+      <div class="carousel" id="carousel"></div>
+    </div>
+
+    <nav class="tab-bar">
+      <button class="tab"><img src="assets/icon/Home.svg" alt="" />Home</button>
+      <button class="tab"><img src="assets/icon/Projects.svg" alt="" />Projects</button>
+      <button class="tab active"><img src="assets/icon/Stories.svg" alt="" />Stories</button>
+      <button class="tab"><img src="assets/icon/Basket.svg" alt="" />Basket</button>
+      <button class="tab"><img src="assets/icon/User.svg" alt="" />Account</button>
+    </nav>
+  </div>
+</div>
+
+<!-- ============== VIEW: ALBUM (Trip to Berlin) ============== -->
+<div class="view view-album" id="viewAlbum" hidden>
+  <div class="phone" id="phone">
+    <div class="header">
+      <div class="app-nav">
+        <a class="back" href="#" aria-label="Back" id="backBtn">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </a>
+        <div class="title">Trip to Berlin 2026</div>
+        <div class="add" aria-label="Add">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="1.5" fill="currentColor"/><polyline points="21 15 16 10 5 21"/><line x1="18" y1="3" x2="18" y2="9"/><line x1="15" y1="6" x2="21" y2="6"/></svg>
+        </div>
+      </div>
+    </div>
+
+    <div class="content" id="content"></div>
+    <div class="safe-bottom"></div>
+  </div>
+
+  <button class="fab" id="createProductBtn" type="button" aria-label="Create photo product">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <rect x="3" y="4" width="18" height="14" rx="2.5"/>
+      <circle cx="8.5" cy="10" r="1.4" fill="currentColor" stroke="none"/>
+      <polyline points="3 16 9 11 13 14 21 7"/>
+    </svg>
+    Create photo product
+  </button>
+
+  <div class="overlay" id="overlay" aria-hidden="true">
+    <div class="overlay-inner">
+      <h3 class="overlay-title" id="overlayTitle"></h3>
+      <div class="overlay-sub" id="overlaySub"></div>
+      <div class="overlay-photos" id="overlayPhotos"></div>
+    </div>
+  </div>
+
+  <div class="edit-banner" id="editBanner">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+    Edit mode · tap photos to hide · tap anywhere else to exit
+  </div>
+
+  <div class="overlay-actions" id="overlayActions">
+    <button class="overlay-btn secondary" id="overlayHide">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a19.42 19.42 0 0 1 5.06-5.94"/><path d="M22.54 12.88A19.5 19.5 0 0 0 23 12s-4-8-11-8a10.9 10.9 0 0 0-2.27.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+      Hide from story
+    </button>
+    <button class="overlay-btn" id="overlayClose">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      Close
+    </button>
+  </div>
+</div>
+
+<script>
+  /* ====================================================================
+     STORIES (carousel) view
+     ==================================================================== */
+  const cards = [
+    { name: "canada",     title: "Canada"     },
+    { name: "berlin",     title: "Berlin",     view: "album" },
+    { name: "italy",      title: "Italy"      },
+    { name: "jane",       title: "Jane"       },
+    { name: "guadalupe",  title: "Guadalupe"  },
+    { name: "cappadocia", title: "Cappadocia" },
+    { name: "etna",       title: "Etna"       },
+  ];
+
+  const carousel = document.getElementById("carousel");
+  cards.forEach((c, i) => {
+    const el = document.createElement(c.view ? "a" : "div");
+    el.className = "card";
+    el.dataset.name = c.name;
+    el.dataset.index = i;
+    if (c.view) {
+      el.href = "#album";
+      el.dataset.view = c.view;
+    }
+    el.innerHTML = `<img src="assets/${c.name}.png" alt="${c.title}" draggable="false" />`;
+    carousel.appendChild(el);
+  });
+
+  const bgA = document.getElementById("bgA");
+  const bgB = document.getElementById("bgB");
+  let activeBg = bgA;
+  let inactiveBg = bgB;
+  let activeBgName = null;
+
+  function setBackground(name) {
+    if (name === activeBgName) return;
+    activeBgName = name;
+    inactiveBg.style.backgroundImage = `url("assets/${name}-background.png")`;
+    inactiveBg.classList.add("active");
+    activeBg.classList.remove("active");
+    [activeBg, inactiveBg] = [inactiveBg, activeBg];
+  }
+
+  const cardEls = carousel.querySelectorAll(".card");
+  let lastActiveIdx = -1;
+
+  function updateActiveCard() {
+    const rect = carousel.getBoundingClientRect();
+    if (rect.width === 0) return; // view hidden
+    const center = rect.left + rect.width / 2;
+    let bestIdx = 0;
+    let bestDist = Infinity;
+    cardEls.forEach((el, i) => {
+      const r = el.getBoundingClientRect();
+      const cx = r.left + r.width / 2;
+      const d = Math.abs(cx - center);
+      if (d < bestDist) { bestDist = d; bestIdx = i; }
+    });
+    if (bestIdx !== lastActiveIdx) {
+      cardEls.forEach((el, i) => el.classList.toggle("active", i === bestIdx));
+      setBackground(cardEls[bestIdx].dataset.name);
+      lastActiveIdx = bestIdx;
+    }
+  }
+
+  let scrollRAF = null;
+  carousel.addEventListener("scroll", () => {
+    if (scrollRAF) return;
+    scrollRAF = requestAnimationFrame(() => {
+      scrollRAF = null;
+      updateActiveCard();
+    });
+  }, { passive: true });
+
+  carousel.addEventListener("click", (e) => {
+    const card = e.target.closest(".card");
+    if (!card) return;
+    e.preventDefault();
+    const idx = parseInt(card.dataset.index, 10);
+    if (idx !== lastActiveIdx) {
+      card.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+      return;
+    }
+    if (card.dataset.view === "album") showAlbum(true);
+  });
+
+  /* ====================================================================
+     ALBUM (Trip to Berlin) view
+     ==================================================================== */
+  const BASE = "Trip%20to%20Berlin/";
+  const imgSrc = (name) => BASE + encodeURIComponent(name);
+
+  const chapters = [
+    {
+      title: "The Journey Begins",
+      meta: "12 April · 5 photos",
+      tiles: [
+        { main: "fraya-is-very-unhappy-i-left-her-in-kentucky_55204305826_o.jpg" },
+        { main: "now-begins-20-hours-of-travel_55201694767_o.jpg" },
+        { main: "departing-evv_55203343539_o.jpg" },
+        { main: "soon-boarding-in-charlotte_55203345084_o.jpg",
+          stack: ["my-reading-this-trip-will-be-alastair-reynolds-the-revelation-space-collection-which-is-4554-pages_55202895783_o.jpg"] },
+      ],
+    },
+    {
+      title: "Arrival in Germany",
+      meta: "13 April · 3 photos",
+      tiles: [
+        { main: "made-it-to-frankfurt-hauptbahnhof-and-got-an-early-train-to-dresden_55203407447_o.jpg" },
+        { main: "made-it-to-frankfurt-hauptbahnhof-and-got-an-early-train-to-dresden_55204552724_o.jpg" },
+        { main: "from-the-train-looking-into-the-saxon-countryside_55205341513_o.jpg" },
+      ],
+    },
+    {
+      title: "Settling at the Boutique Hotel",
+      meta: "13 April · 2 photos",
+      tiles: [
+        { main: "my-room-at-the-boutique-hotel-rothenburger_55205339623_o.jpg" },
+        { main: "my-room-at-the-boutique-hotel-rothenburger_55204291957_o.jpg" },
+      ],
+    },
+    {
+      title: "First Day in Dresden",
+      meta: "14 April · 4 photos",
+      tiles: [
+        { main: "schmidt_55205567439_o.jpg" },
+        { main: "three-kings-church_55205572564_o.jpg" },
+        { main: "paco-has-arrived_55207856675_o.jpg" },
+        { main: "paco-has-arrived_55207454856_o.jpg" },
+      ],
+    },
+    {
+      title: "Schmidt's Studio",
+      meta: "15 April · 1 photo",
+      tiles: [
+        { main: "schmidt-in-schmidts-office_55210957926_o.jpg" },
+      ],
+    },
+    {
+      title: "Wandering Der Zwinger",
+      meta: "15 April · 2 photos",
+      tiles: [
+        { main: "der-zwinger-dresden_55209218347_o.jpg" },
+        { main: "der-zwinger-dresden_55210272298_o.jpg" },
+      ],
+    },
+    {
+      title: "A Beautiful Morning",
+      meta: "16 April · 4 photos",
+      tiles: [
+        { main: "a-beautiful-morning-and-wonderful-breakfast_55212820508_o.jpg" },
+        { main: "a-beautiful-morning-and-wonderful-breakfast_55213065380_o.jpg" },
+        { main: "out-on-the-town-this-morning_55212825378_o.jpg" },
+        { main: "out-on-the-town-this-morning_55213070085_o.jpg" },
+      ],
+    },
+    {
+      title: "At the Albertinum Museum",
+      meta: "16 April · 11 photos",
+      tiles: [
+        { main: "at-the-albertinum-museum_55213340473_o.jpg" },
+        { main: "at-the-albertinum-museum_55213340538_o.jpg" },
+        { main: "at-the-albertinum-museum_55213187121_o.jpg",
+          stack: [
+            "at-the-albertinum-museum_55213431214_o.jpg",
+            "at-the-albertinum-museum_55213586545_o.jpg",
+          ] },
+        { main: "at-the-albertinum-museum_55213340698_o.jpg" },
+        { main: "at-the-albertinum-museum_55213971616_o.jpg" },
+        { main: "at-the-albertinum-museum_55214216319_o.jpg",
+          stack: [
+            "at-the-albertinum-museum_55213431864_o.jpg",
+            "at-the-albertinum-museum_55214368900_o.jpg",
+          ] },
+        { main: "55214128598_5a945175b7_o.jpg" },
+      ],
+    },
+    {
+      title: "A Night at the Semperoper",
+      meta: "16 April · 5 photos",
+      tiles: [
+        { main: "55213072917_c443585f82_o.jpg" },
+        { main: "55213072822_257c18e819_o.jpg" },
+        { main: "55214219089_2346de6a8c_o.jpg",
+          stack: ["55214371785_42083b5bb7_o.jpg"] },
+        { main: "55214127908_bcb3810dc2_o.jpg" },
+      ],
+    },
+    {
+      title: "Finally in Berlin",
+      meta: "18 April · 3 photos",
+      tiles: [
+        { main: "finally-in-berlin_55216667916_o.jpg" },
+        { main: "finally-in-berlin_55216920529_o.jpg" },
+        { main: "finally-in-berlin_55217062540_o.jpg" },
+      ],
+    },
+    {
+      title: "Berlin Cathedral & TV Tower",
+      meta: "18 April · 4 photos",
+      tiles: [
+        { main: "berlin_55217678313_o.jpg" },
+        { main: "berlin_55216624597_o.jpg" },
+        { main: "berlin_55224400770_o.jpg",
+          stack: ["berlin_55217741268_o.jpg"] },
+      ],
+    },
+    {
+      title: "Rooftop Views Over Berlin",
+      meta: "18 April · 12 photos",
+      tiles: [
+        { main: "berlin_55217585186_o.jpg",
+          stack: [
+            "berlin_55217775837_o.jpg",
+            "berlin_55221296062_o.jpg",
+            "berlin_55221600882_o.jpg",
+            "berlin_55222875925_o.jpg",
+          ] },
+        { main: "berlin_55217677318_o.jpg" },
+        { main: "berlin_55217775159_o.jpg" },
+        { main: "berlin_55218676486_o.jpg",
+          stack: [
+            "berlin_55219203279_o.jpg",
+            "berlin_55222447949_o.jpg",
+            "berlin_55222664423_o.jpg",
+            "berlin_55222876075_o.jpg",
+          ] },
+      ],
+    },
+    {
+      title: "Coffee, Wurst & Beer",
+      meta: "18–19 April · 16 photos",
+      tiles: [
+        { main: "berlin_55217741088_o.jpg",
+          stack: [
+            "berlin_55219104028_o.jpg",
+            "berlin_55221566017_o.jpg",
+            "berlin_55222752004_o.jpg",
+          ] },
+        { main: "berlin_55217585856_o.jpg" },
+        { main: "berlin_55217522771_o.jpg" },
+        { main: "berlin_55217678833_o.jpg",
+          stack: [
+            "berlin_55219105418_o.jpg",
+            "berlin_55222605755_o.jpg",
+            "berlin_55222629863_o.jpg",
+            "berlin_55222910775_o.jpg",
+            "berlin_55217981995_o.jpg",
+          ] },
+        { main: "berlin_55217774939_o.jpg" },
+        { main: "berlin_55219070835_o.jpg",
+          stack: [
+            "berlin_55219349835_o.jpg",
+            "berlin_55221295557_o.jpg",
+          ] },
+      ],
+    },
+    {
+      title: "Inside the Grand Hotel",
+      meta: "18–19 April · 19 photos",
+      tiles: [
+        { main: "berlin_55218930114_o.jpg",
+          stack: [
+            "berlin_55218950176_o.jpg",
+            "berlin_55219075060_o.jpg",
+            "berlin_55221296232_o.jpg",
+            "berlin_55221566092_o.jpg",
+            "berlin_55222605760_o.jpg",
+            "berlin_55222752014_o.jpg",
+          ] },
+        { main: "berlin_55217919560_o.jpg",
+          stack: [
+            "berlin_55218676921_o.jpg",
+            "berlin_55219199939_o.jpg",
+            "berlin_55219203754_o.jpg",
+            "berlin_55222605725_o.jpg",
+            "berlin_55222752039_o.jpg",
+            "berlin_55217838909_o.jpg",
+            "berlin_55222629798_o.jpg",
+          ] },
+        { main: "berlin_55223991976_o.jpg" },
+        { main: "berlin_55217981795_o.jpg",
+          stack: ["berlin_55217839044_o.jpg"] },
+        { main: "berlin_55218834613_o.jpg" },
+      ],
+    },
+  ];
+
+  function gridClass(count) {
+    if (count === 1) return "cols-1";
+    if (count === 2) return "cols-2";
+    if (count === 3) return "cols-3";
+    if (count === 4) return "cols-2";
+    if (count === 5) return "cols-2";
+    if (count === 6) return "cols-3";
+    if (count >= 9) return "cols-3";
+    return "cols-2";
+  }
+
+  function tileHTML(tile, idx) {
+    const rot = (((idx * 37) % 100) / 100) * 5 - 2.5;
+    const stack = tile.stack || [];
+    const layers = stack.slice(0, 3);
+    const isStack = stack.length > 0;
+
+    let layersHTML = "";
+    layers.forEach((name, i) => {
+      layersHTML += `<img class="stack-layer l${i+1}" src="${imgSrc(name)}" alt="" />`;
+    });
+
+    const allPhotos = [tile.main, ...stack];
+    const data = encodeURIComponent(JSON.stringify(allPhotos));
+
+    return `
+      <div class="tile ${isStack ? 'is-stack' : ''}" data-photos="${data}" data-rot="${rot.toFixed(2)}">
+        <div class="frame" style="--rot:${rot.toFixed(2)}deg; transform: rotate(${rot.toFixed(2)}deg);">
+          ${layersHTML}
+          <img class="main" src="${imgSrc(tile.main)}" alt="" />
+          ${isStack ? `<div class="stack-badge">+${stack.length}</div>` : ""}
+          <button class="tile-hide-btn" aria-label="Hide from story">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+      </div>`;
+  }
+
+  const root = document.getElementById("content");
+  let tileIdx = 0;
+  chapters.forEach((ch, ci) => {
+    const cls = gridClass(ch.tiles.length);
+    const tilesHTML = ch.tiles.map(t => tileHTML(t, tileIdx++)).join("");
+    root.insertAdjacentHTML("beforeend", `
+      <section class="chapter" id="ch-${ci}">
+        <h2 class="chapter-title">${ch.title}</h2>
+        <div class="chapter-meta">${ch.meta}</div>
+        <div class="grid ${cls}">${tilesHTML}</div>
+      </section>
+    `);
+  });
+
+  document.querySelectorAll(".tile").forEach((t, i) => {
+    const d = -(((i * 17) % 100) / 1000).toFixed(3);
+    t.style.setProperty("--wiggle-delay", d + "s");
+  });
+
+  // Lightbox overlay
+  const overlay = document.getElementById("overlay");
+  const overlayPhotos = document.getElementById("overlayPhotos");
+  const overlayClose = document.getElementById("overlayClose");
+  const overlayHide = document.getElementById("overlayHide");
+  const overlayActions = document.getElementById("overlayActions");
+  const overlayTitle = document.getElementById("overlayTitle");
+  const overlaySub = document.getElementById("overlaySub");
+
+  let currentSourceTile = null;
+  function openPreview(photos, tileEl, mode) {
+    overlayPhotos.innerHTML = "";
+    currentSourceTile = tileEl;
+
+    const chapter = tileEl.closest(".chapter");
+    const chTitle = chapter ? chapter.querySelector(".chapter-title").textContent : "";
+    overlayTitle.textContent = chTitle;
+
+    if (mode === "single") {
+      overlaySub.textContent = "";
+      overlayPhotos.className = "overlay-photos single";
+      overlayHide.style.display = "inline-flex";
+    } else {
+      overlaySub.textContent = `${photos.length} photos · swipe to browse`;
+      overlayPhotos.className = "overlay-photos swiper";
+      overlayHide.style.display = "none";
+    }
+
+    photos.forEach((name, i) => {
+      const div = document.createElement("div");
+      div.className = "overlay-photo";
+      div.dataset.name = name;
+      div.style.setProperty("--ovrot", "0deg");
+      div.innerHTML = `
+        <img src="${imgSrc(name)}" alt="" />
+        ${mode === "stack" ? `
+          <button class="overlay-photo-hide" aria-label="Hide this photo">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        ` : ""}
+      `;
+      overlayPhotos.appendChild(div);
+    });
+
+    overlay.classList.add("open");
+    overlay.setAttribute("aria-hidden", "false");
+    overlayActions.classList.add("show");
+    document.body.style.overflow = "hidden";
+    overlay.scrollTop = 0;
+
+    const sourceImg = tileEl.querySelector("img.main");
+    if (sourceImg) {
+      const sourceRect = sourceImg.getBoundingClientRect();
+      requestAnimationFrame(() => {
+        const firstPhoto = overlayPhotos.querySelector(".overlay-photo");
+        const firstImg = firstPhoto ? firstPhoto.querySelector("img") : null;
+        if (!firstImg) return;
+        requestAnimationFrame(() => {
+          const targetRect = firstImg.getBoundingClientRect();
+          if (!targetRect.width || !targetRect.height) return;
+          const dx = (sourceRect.left + sourceRect.width/2) - (targetRect.left + targetRect.width/2);
+          const dy = (sourceRect.top + sourceRect.height/2) - (targetRect.top + targetRect.height/2);
+          const scale = sourceRect.width / targetRect.width;
+          firstImg.style.transition = "none";
+          firstImg.style.transformOrigin = "center";
+          firstImg.style.transform = `translate(${dx.toFixed(1)}px, ${dy.toFixed(1)}px) scale(${scale.toFixed(3)})`;
+          firstImg.style.opacity = "1";
+          firstImg.offsetHeight;
+          firstImg.style.transition = "transform 0.45s cubic-bezier(0.2, 0.9, 0.25, 1.05), opacity 0.25s ease";
+          firstImg.style.transform = "translate(0,0) scale(1)";
+          setTimeout(() => {
+            firstImg.style.transition = "";
+            firstImg.style.transform = "";
+          }, 520);
+        });
+      });
+    }
+  }
+
+  function closeOverlay() {
+    overlay.classList.remove("open");
+    overlay.setAttribute("aria-hidden", "true");
+    overlayActions.classList.remove("show");
+    document.body.style.overflow = "";
+    setTimeout(() => { overlayPhotos.innerHTML = ""; }, 400);
+  }
+
+  // Long-press → edit mode + drag-to-reorder
+  let pressTimer = null;
+  let suppressNextClick = false;
+  let pressOriginX = 0, pressOriginY = 0;
+  let pendingTile = null;
+  let dragState = null;
+  let autoScrollRAF = null;
+  const DRAG_THRESHOLD = 8;
+  const LONG_PRESS_MS = 480;
+
+  function clearPress() {
+    if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+  }
+
+  document.addEventListener("pointerdown", (e) => {
+    if (e.target.closest(".tile-hide-btn")) return;
+    if (e.target.closest(".overlay")) return;
+    const tile = e.target.closest(".tile");
+    if (!tile) return;
+
+    pendingTile = tile;
+    pressOriginX = e.clientX; pressOriginY = e.clientY;
+    clearPress();
+
+    if (!document.body.classList.contains("edit-mode")) {
+      pressTimer = setTimeout(() => {
+        document.body.classList.add("edit-mode");
+        suppressNextClick = true;
+        if (navigator.vibrate) { try { navigator.vibrate(12); } catch (_) {} }
+      }, LONG_PRESS_MS);
+    }
+  });
+
+  document.addEventListener("pointermove", (e) => {
+    const movedFar =
+      Math.abs(e.clientX - pressOriginX) > DRAG_THRESHOLD ||
+      Math.abs(e.clientY - pressOriginY) > DRAG_THRESHOLD;
+
+    if (pressTimer && movedFar) clearPress();
+
+    if (pendingTile && !dragState && movedFar &&
+        document.body.classList.contains("edit-mode")) {
+      startDrag(pendingTile, e.clientX, e.clientY);
+      pendingTile = null;
+    }
+
+    if (dragState) {
+      e.preventDefault();
+      updateDrag(e.clientX, e.clientY);
+    }
+  }, { passive: false });
+
+  document.addEventListener("pointerup", () => {
+    pendingTile = null;
+    clearPress();
+    if (dragState) {
+      suppressNextClick = true;
+      endDrag();
+    }
+  });
+  document.addEventListener("pointercancel", () => {
+    pendingTile = null;
+    clearPress();
+    if (dragState) endDrag();
+  });
+  document.addEventListener("scroll", () => {
+    if (!dragState) clearPress();
+  }, true);
+
+  function startDrag(tile, x, y) {
+    if (navigator.vibrate) { try { navigator.vibrate(8); } catch (_) {} }
+
+    const rect = tile.getBoundingClientRect();
+
+    const placeholder = document.createElement("div");
+    placeholder.className = "tile-placeholder";
+    placeholder.style.minHeight = rect.height + "px";
+    tile.parentNode.insertBefore(placeholder, tile);
+
+    tile.classList.add("dragging");
+    tile.style.position = "fixed";
+    tile.style.left = rect.left + "px";
+    tile.style.top = rect.top + "px";
+    tile.style.width = rect.width + "px";
+    tile.style.height = rect.height + "px";
+    tile.style.transform = "none";
+    tile.style.pointerEvents = "none";
+    document.body.classList.add("dragging");
+
+    dragState = {
+      tile, placeholder,
+      grabOffsetX: x - rect.left,
+      grabOffsetY: y - rect.top,
+      lastX: x, lastY: y,
+      autoScrollDir: 0,
+    };
+    startAutoScroll();
+  }
+
+  function updateDrag(x, y) {
+    const s = dragState;
+    s.lastX = x; s.lastY = y;
+    s.tile.style.left = (x - s.grabOffsetX) + "px";
+    s.tile.style.top = (y - s.grabOffsetY) + "px";
+
+    const el = document.elementFromPoint(x, y);
+    if (el) {
+      const overTile = el.closest(".tile:not(.dragging)");
+      if (overTile) {
+        const r = overTile.getBoundingClientRect();
+        const horizontalSiblings =
+          overTile.previousElementSibling && Math.abs(overTile.getBoundingClientRect().top - overTile.previousElementSibling.getBoundingClientRect().top) < 4
+          || overTile.nextElementSibling && Math.abs(overTile.getBoundingClientRect().top - overTile.nextElementSibling.getBoundingClientRect().top) < 4;
+        const afterTarget = horizontalSiblings
+          ? x > r.left + r.width / 2
+          : y > r.top + r.height / 2;
+        overTile.parentNode.insertBefore(
+          s.placeholder,
+          afterTarget ? overTile.nextSibling : overTile
+        );
+      } else {
+        const overGrid = el.closest(".grid");
+        if (overGrid && !overGrid.contains(s.placeholder)) {
+          overGrid.appendChild(s.placeholder);
+        }
+      }
+    }
+
+    const SCROLL_ZONE = 90;
+    if (y < SCROLL_ZONE) s.autoScrollDir = -1;
+    else if (y > window.innerHeight - SCROLL_ZONE) s.autoScrollDir = 1;
+    else s.autoScrollDir = 0;
+  }
+
+  function startAutoScroll() {
+    function step() {
+      if (!dragState) return;
+      if (dragState.autoScrollDir !== 0) {
+        window.scrollBy(0, dragState.autoScrollDir * 10);
+        updateDrag(dragState.lastX, dragState.lastY);
+      }
+      autoScrollRAF = requestAnimationFrame(step);
+    }
+    autoScrollRAF = requestAnimationFrame(step);
+  }
+  function cancelAutoScroll() {
+    if (autoScrollRAF) { cancelAnimationFrame(autoScrollRAF); autoScrollRAF = null; }
+  }
+
+  function endDrag() {
+    cancelAutoScroll();
+    const s = dragState;
+    dragState = null;
+
+    const placeholderRect = s.placeholder.getBoundingClientRect();
+    s.tile.style.transition = "left 0.22s ease, top 0.22s ease, width 0.22s ease";
+    s.tile.style.left = placeholderRect.left + "px";
+    s.tile.style.top = placeholderRect.top + "px";
+    s.tile.style.width = placeholderRect.width + "px";
+
+    setTimeout(() => {
+      s.placeholder.parentNode.insertBefore(s.tile, s.placeholder);
+      s.placeholder.remove();
+      s.tile.classList.remove("dragging");
+      s.tile.style.position = "";
+      s.tile.style.left = "";
+      s.tile.style.top = "";
+      s.tile.style.width = "";
+      s.tile.style.height = "";
+      s.tile.style.transform = "";
+      s.tile.style.transition = "";
+      s.tile.style.pointerEvents = "";
+      document.body.classList.remove("dragging");
+
+      refreshChapterCounts();
+      onScroll();
+    }, 230);
+  }
+
+  function refreshChapterCounts() {
+    document.querySelectorAll(".chapter").forEach(ch => {
+      const grid = ch.querySelector(".grid");
+      if (!grid) return;
+      const visible = Array.from(grid.children).filter(c =>
+        c.classList.contains("tile") &&
+        c.style.display !== "none" &&
+        !c.classList.contains("removing"));
+      const count = visible.length;
+      grid.classList.remove("cols-1","cols-2","cols-3");
+      grid.classList.add(gridClass(count));
+      const meta = ch.querySelector(".chapter-meta");
+      if (meta) {
+        meta.textContent = meta.textContent.replace(
+          /(\d+)\s+photos?/,
+          `${count} photo${count !== 1 ? "s" : ""}`
+        );
+      }
+    });
+  }
+
+  function syncTileFromPhotos(tile, photos) {
+    if (!tile) return;
+    tile.dataset.photos = encodeURIComponent(JSON.stringify(photos));
+    const frame = tile.querySelector(".frame");
+    if (!frame) return;
+
+    const mainImg = frame.querySelector("img.main");
+    if (mainImg && photos[0]) mainImg.src = imgSrc(photos[0]);
+
+    frame.querySelectorAll(".stack-layer").forEach(l => l.remove());
+    const layerPhotos = photos.slice(1, 4);
+    layerPhotos.forEach((name, i) => {
+      const layer = document.createElement("img");
+      layer.className = `stack-layer l${i+1}`;
+      layer.src = imgSrc(name);
+      layer.alt = "";
+      frame.insertBefore(layer, mainImg);
+    });
+
+    let badge = frame.querySelector(".stack-badge");
+    if (photos.length > 1) {
+      if (!badge) {
+        badge = document.createElement("div");
+        badge.className = "stack-badge";
+        const hideBtn = frame.querySelector(".tile-hide-btn");
+        frame.insertBefore(badge, hideBtn || null);
+      }
+      badge.textContent = `+${photos.length - 1}`;
+      tile.classList.add("is-stack");
+    } else {
+      if (badge) badge.remove();
+      tile.classList.remove("is-stack");
+    }
+  }
+
+  function hideStackPhoto(overlayPhoto) {
+    if (!currentSourceTile) return;
+    const name = overlayPhoto.dataset.name;
+    let photos;
+    try { photos = JSON.parse(decodeURIComponent(currentSourceTile.dataset.photos)); }
+    catch (_) { return; }
+    const idx = photos.indexOf(name);
+    if (idx === -1) return;
+    photos.splice(idx, 1);
+
+    overlayPhoto.classList.add("hiding");
+
+    setTimeout(() => {
+      overlayPhoto.remove();
+      if (photos.length === 0) {
+        const tile = currentSourceTile;
+        closeOverlay();
+        setTimeout(() => {
+          tile.classList.add("removing");
+          setTimeout(() => { tile.style.display = "none"; }, 340);
+        }, 180);
+        return;
+      }
+      syncTileFromPhotos(currentSourceTile, photos);
+      overlaySub.textContent = `${photos.length} photo${photos.length > 1 ? "s" : ""} · swipe to browse`;
+    }, 340);
+  }
+
+  document.addEventListener("click", (e) => {
+    if (suppressNextClick) {
+      suppressNextClick = false;
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+
+    const overlayHideBtn = e.target.closest(".overlay-photo-hide");
+    if (overlayHideBtn) {
+      e.stopPropagation();
+      const photoEl = overlayHideBtn.closest(".overlay-photo");
+      if (photoEl) hideStackPhoto(photoEl);
+      return;
+    }
+
+    const tileHideBtn = e.target.closest(".tile-hide-btn");
+    if (tileHideBtn) {
+      e.stopPropagation();
+      const tile = tileHideBtn.closest(".tile");
+      if (tile) {
+        tile.classList.add("removing");
+        setTimeout(() => { tile.style.display = "none"; }, 340);
+      }
+      return;
+    }
+
+    const tile = e.target.closest(".tile");
+    const inEdit = document.body.classList.contains("edit-mode");
+
+    if (inEdit && !tile) {
+      if (overlay.classList.contains("open")) return;
+      if (e.target.closest(".overlay, .overlay-actions, .edit-banner, .header")) return;
+      document.body.classList.remove("edit-mode");
+      return;
+    }
+
+    if (tile) {
+      try {
+        const photos = JSON.parse(decodeURIComponent(tile.dataset.photos));
+        const isStack = tile.classList.contains("is-stack");
+        openPreview(photos, tile, isStack ? "stack" : "single");
+      } catch (err) { console.error(err); }
+    }
+  });
+
+  overlayClose.addEventListener("click", (e) => {
+    e.stopPropagation();
+    closeOverlay();
+  });
+  overlayHide.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const tile = currentSourceTile;
+    closeOverlay();
+    if (tile) {
+      setTimeout(() => {
+        tile.classList.add("removing");
+        setTimeout(() => { tile.style.display = "none"; }, 340);
+      }, 200);
+    }
+  });
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay || e.target.classList.contains("overlay-inner")) {
+      e.stopPropagation();
+      closeOverlay();
+    }
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && overlay.classList.contains("open")) closeOverlay();
+  });
+
+  // Rubber-band scroll offset
+  const tiles = document.querySelectorAll(".tile");
+  const frames = document.querySelectorAll(".tile .frame");
+  const RANGE = 220;
+  const MAX = 36;
+  const C1 = 1.70158;
+  const C3 = C1 + 1;
+
+  let rafId = null;
+  function update() {
+    rafId = null;
+    const vh = window.innerHeight;
+
+    tiles.forEach((tile) => {
+      if (tile.classList.contains("dragging")) return;
+      const r = tile.getBoundingClientRect();
+      const distBelow = r.top - vh;
+      let offset;
+      if (distBelow >= RANGE) {
+        offset = MAX;
+      } else if (distBelow <= -RANGE) {
+        offset = 0;
+      } else {
+        const t = (RANGE - distBelow) / (2 * RANGE);
+        const eased = 1 + C3 * Math.pow(t - 1, 3) + C1 * Math.pow(t - 1, 2);
+        offset = MAX * (1 - eased);
+      }
+      tile.style.transform = `translate3d(0, ${offset.toFixed(2)}px, 0)`;
+    });
+
+    frames.forEach(el => {
+      if (el.parentElement && el.parentElement.classList.contains("dragging")) return;
+      const r = el.getBoundingClientRect();
+      const c = r.top + r.height / 2;
+      const d = (c - vh / 2) / vh;
+      const base = parseFloat(el.style.getPropertyValue("--rot")) || 0;
+      el.style.transform = `rotate(${(base + d * 0.5).toFixed(2)}deg)`;
+    });
+  }
+
+  function onScroll() {
+    if (rafId) return;
+    rafId = requestAnimationFrame(update);
+  }
+  window.addEventListener("scroll", onScroll, { passive: true });
+  window.addEventListener("resize", onScroll, { passive: true });
+
+  /* ====================================================================
+     View switching (single-page app)
+     ==================================================================== */
+  const viewStories = document.getElementById("viewStories");
+  const viewAlbum = document.getElementById("viewAlbum");
+
+  function showAlbum(push) {
+    if (overlay.classList.contains("open")) closeOverlay();
+    if (push) history.pushState({ view: "album" }, "", "#album");
+    viewStories.hidden = true;
+    viewAlbum.hidden = false;
+    window.scrollTo(0, 0);
+    update();
+  }
+
+  function showStories(push) {
+    if (overlay.classList.contains("open")) closeOverlay();
+    if (document.body.classList.contains("edit-mode")) document.body.classList.remove("edit-mode");
+    if (push) history.pushState({ view: "stories" }, "", "#");
+    viewAlbum.hidden = true;
+    viewStories.hidden = false;
+    requestAnimationFrame(updateActiveCard);
+  }
+
+  window.addEventListener("popstate", (e) => {
+    const view = (e.state && e.state.view) || (location.hash === "#album" ? "album" : "stories");
+    if (view === "album") {
+      viewStories.hidden = true;
+      viewAlbum.hidden = false;
+      update();
+    } else {
+      if (overlay.classList.contains("open")) closeOverlay();
+      if (document.body.classList.contains("edit-mode")) document.body.classList.remove("edit-mode");
+      viewAlbum.hidden = true;
+      viewStories.hidden = false;
+      requestAnimationFrame(updateActiveCard);
+    }
+  });
+
+  document.getElementById("backBtn").addEventListener("click", (e) => {
+    e.preventDefault();
+    history.back();
+  });
+
+  // Initial state — based on URL hash
+  if (location.hash === "#album") {
+    // Seed history so back gesture lands on stories instead of leaving the PWA
+    history.replaceState({ view: "stories" }, "", location.pathname);
+    history.pushState({ view: "album" }, "", "#album");
+    viewStories.hidden = true;
+    viewAlbum.hidden = false;
+  } else {
+    history.replaceState({ view: "stories" }, "", location.pathname);
+  }
+
+  // Initial paint
+  requestAnimationFrame(updateActiveCard);
+  update();
+
+  /* ====================================================================
+     Gyroscope-driven 3D tilt for carousel cards
+     iOS 13+ requires explicit DeviceOrientation permission, gated on a
+     real user gesture; non-iOS browsers just need the listener attached.
+     iOS Safari also requires HTTPS (or localhost) — orientation events
+     won't fire over plain http:// from a LAN IP.
+     ==================================================================== */
+  (function setupGyroTilt() {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    let latestG = 0, latestB = 0;     // most-recent gamma/beta from sensor
+    let curG = 0, curB = 0;           // lerped values
+    let listening = false;
+    let ticking = false;
+
+    const MAX_RY = 14;                // deg, left/right tilt clamp
+    const MAX_RX = 9;                 // deg, forward/back tilt clamp
+    const ACTIVE_AMP = 1.5;           // active card tilts more
+    const NEIGHBOR_AMP = 0.7;
+    const LERP = 0.12;
+    const NEUTRAL_BETA = 35;          // assumed phone-holding angle
+
+    function onOrientation(e) {
+      if (e.gamma == null || e.beta == null) return;
+      latestG = e.gamma;
+      latestB = e.beta - NEUTRAL_BETA;
+      if (!ticking) { ticking = true; requestAnimationFrame(tick); }
+    }
+
+    function attachOrientation() {
+      if (listening) return;
+      listening = true;
+      window.addEventListener("deviceorientation", onOrientation, { passive: true });
+    }
+
+    function maybeRequestPermission() {
+      const req = window.DeviceOrientationEvent && DeviceOrientationEvent.requestPermission;
+      if (typeof req !== "function") { attachOrientation(); return; }
+      req().then(state => { if (state === "granted") attachOrientation(); }).catch(() => {});
+    }
+    carousel.addEventListener("pointerdown", maybeRequestPermission, { once: true });
+
+    function tick() {
+      curG += (latestG - curG) * LERP;
+      curB += (latestB - curB) * LERP;
+      if (!viewStories.hidden) {
+        const ry = Math.max(-MAX_RY, Math.min(MAX_RY,  curG * 0.35));
+        const rx = Math.max(-MAX_RX, Math.min(MAX_RX, -curB * 0.35));
+        cardEls.forEach((el, i) => {
+          const amp = (i === lastActiveIdx) ? ACTIVE_AMP : NEIGHBOR_AMP;
+          el.style.setProperty("--ry", (ry * amp).toFixed(2) + "deg");
+          el.style.setProperty("--rx", (rx * amp).toFixed(2) + "deg");
+        });
+      }
+      requestAnimationFrame(tick);
+    }
+  })();
+</script>
+</body>
+</html>
