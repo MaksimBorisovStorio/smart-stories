@@ -1254,9 +1254,16 @@
   let autoScrollRAF = null;
   const DRAG_THRESHOLD = 8;
   const LONG_PRESS_MS = 480;
+  const DRAG_ARM_MS = 200;  // dwell in edit-mode before drag can take over from scroll
+  let dragArmTimer = null;
+  let dragArmed = false;
 
   function clearPress() {
     if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+  }
+  function clearDragArm() {
+    if (dragArmTimer) { clearTimeout(dragArmTimer); dragArmTimer = null; }
+    dragArmed = false;
   }
 
   // Block iOS's native long-press image preview/context menu over photos
@@ -1274,6 +1281,7 @@
     pendingTile = tile;
     pressOriginX = e.clientX; pressOriginY = e.clientY;
     clearPress();
+    clearDragArm();
 
     if (!document.body.classList.contains("edit-mode")) {
       pressTimer = setTimeout(() => {
@@ -1281,6 +1289,13 @@
         suppressNextClick = true;
         if (navigator.vibrate) { try { navigator.vibrate(12); } catch (_) {} }
       }, LONG_PRESS_MS);
+    } else {
+      // Already in edit mode — wait a beat before letting movement
+      // become a drag, so a quick swipe still scrolls the page.
+      dragArmTimer = setTimeout(() => {
+        dragArmed = true;
+        dragArmTimer = null;
+      }, DRAG_ARM_MS);
     }
   });
 
@@ -1293,8 +1308,15 @@
 
     if (pendingTile && !dragState && movedFar &&
         document.body.classList.contains("edit-mode")) {
-      startDrag(pendingTile, e.clientX, e.clientY);
-      pendingTile = null;
+      if (dragArmed) {
+        startDrag(pendingTile, e.clientX, e.clientY);
+        pendingTile = null;
+        clearDragArm();
+      } else {
+        // Still inside the dwell window — yield to native scroll.
+        pendingTile = null;
+        clearDragArm();
+      }
     }
 
     if (dragState) {
@@ -1306,6 +1328,7 @@
   document.addEventListener("pointerup", () => {
     pendingTile = null;
     clearPress();
+    clearDragArm();
     if (dragState) {
       suppressNextClick = true;
       endDrag();
@@ -1314,10 +1337,15 @@
   document.addEventListener("pointercancel", () => {
     pendingTile = null;
     clearPress();
+    clearDragArm();
     if (dragState) endDrag();
   });
   document.addEventListener("scroll", () => {
-    if (!dragState) clearPress();
+    if (!dragState) {
+      clearPress();
+      clearDragArm();
+      pendingTile = null;
+    }
   }, true);
 
   function startDrag(tile, x, y) {
