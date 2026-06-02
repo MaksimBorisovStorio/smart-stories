@@ -533,6 +533,83 @@
 
   .safe-bottom { height: 32px; }
 
+  /* =====================================================================
+     Stories → Album opening animation: halo expand + cascade.
+     - Stories chrome (header, carousel, tab bar) fades out + drifts up
+     - Halo backdrop scales up and un-blurs slightly, becoming the bridge
+     - Album view fades in over it; its header drops in; chapters cascade
+     ===================================================================== */
+  .view-stories.exiting {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    overflow: hidden;
+  }
+  .view-album.entering {
+    position: relative;
+    z-index: 2;
+  }
+  .view-stories.exiting .header,
+  .view-stories.exiting .carousel-wrap,
+  .view-stories.exiting .tab-bar {
+    transition: opacity 0.32s ease, transform 0.32s ease;
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  .view-stories.exiting .card-bg-stack {
+    transition: transform 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+    transform: translate(-50%, -180px) scale(1.55);
+  }
+  .view-stories.exiting .card-bg.active {
+    transition: filter 0.7s ease;
+    filter: blur(28px) saturate(1.6);
+  }
+
+  .view-album.entering {
+    animation: album-enter-fade 0.5s cubic-bezier(0.34, 1.2, 0.64, 1) both;
+  }
+  @keyframes album-enter-fade {
+    from { opacity: 0; transform: translateY(18px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .view-album.entering .header {
+    animation: album-enter-header 0.55s 0.08s cubic-bezier(0.34, 1.4, 0.64, 1) both;
+  }
+  @keyframes album-enter-header {
+    from { opacity: 0; transform: translateY(-16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .view-album.entering .chapter {
+    animation: album-enter-chapter 0.6s cubic-bezier(0.34, 1.35, 0.64, 1) both;
+  }
+  .view-album.entering .chapter:nth-of-type(1) { animation-delay: 0.18s; }
+  .view-album.entering .chapter:nth-of-type(2) { animation-delay: 0.27s; }
+  .view-album.entering .chapter:nth-of-type(3) { animation-delay: 0.36s; }
+  .view-album.entering .chapter:nth-of-type(4) { animation-delay: 0.45s; }
+  .view-album.entering .chapter:nth-of-type(5) { animation-delay: 0.54s; }
+  .view-album.entering .chapter:nth-of-type(n+6) { animation-delay: 0.6s; }
+  @keyframes album-enter-chapter {
+    from { opacity: 0; transform: translateY(36px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .view-stories.exiting .header,
+    .view-stories.exiting .carousel-wrap,
+    .view-stories.exiting .tab-bar,
+    .view-stories.exiting .card-bg-stack,
+    .view-stories.exiting .card-bg.active,
+    .view-album.entering,
+    .view-album.entering .header,
+    .view-album.entering .chapter {
+      animation: none !important;
+      transition: none !important;
+      transform: none !important;
+      opacity: 1 !important;
+      filter: none !important;
+    }
+  }
+
   .fab {
     position: fixed;
     left: 50%;
@@ -1698,6 +1775,9 @@
   let rafId = null;
   function update() {
     rafId = null;
+    // Rubber-band writes inline transforms on .tile and .frame, which would
+    // override the chapter-cascade entrance animation. Stay quiet during it.
+    if (document.body.classList.contains("entering-album")) return;
     const vh = window.innerHeight;
 
     tiles.forEach((tile) => {
@@ -1743,16 +1823,47 @@
   function showAlbum(push) {
     if (overlay.classList.contains("open")) closeOverlay();
     if (push) history.pushState({ view: "album" }, "", "#album");
-    viewStories.hidden = true;
+
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduceMotion) {
+      viewStories.hidden = true;
+      viewAlbum.hidden = false;
+      window.scrollTo(0, 0);
+      update();
+      return;
+    }
+
+    // Layered transition: keep stories visible so the halo can expand
+    // behind the incoming album. Cleanup hides stories once the cascade
+    // has landed (~900ms covers the longest staggered chapter).
     viewAlbum.hidden = false;
     window.scrollTo(0, 0);
-    update();
+    document.body.classList.add("entering-album");
+    viewStories.classList.add("exiting");
+    viewAlbum.classList.add("entering");
+
+    clearTimeout(showAlbum._cleanup);
+    showAlbum._cleanup = setTimeout(() => {
+      viewStories.hidden = true;
+      viewStories.classList.remove("exiting");
+      viewAlbum.classList.remove("entering");
+      document.body.classList.remove("entering-album");
+      update();
+    }, 900);
   }
 
   function showStories(push) {
     if (overlay.classList.contains("open")) closeOverlay();
     if (document.body.classList.contains("edit-mode")) document.body.classList.remove("edit-mode");
     if (push) history.pushState({ view: "stories" }, "", "#");
+
+    // If a stories→album transition is still running, abort it cleanly so
+    // the back gesture doesn't leave us in a half-animated state.
+    clearTimeout(showAlbum._cleanup);
+    viewStories.classList.remove("exiting");
+    viewAlbum.classList.remove("entering");
+    document.body.classList.remove("entering-album");
+
     viewAlbum.hidden = true;
     viewStories.hidden = false;
     requestAnimationFrame(updateActiveCard);
