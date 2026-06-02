@@ -345,6 +345,16 @@
     z-index: 3;
   }
 
+  /* Suppress iOS's native long-press image menu (Save/Share/Look Up) so
+     our long-press-to-edit gesture doesn't conflict with it. */
+  .tile, .tile img, .stack-layer,
+  .overlay-photo, .overlay-photo img,
+  .card, .card img {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
   .stack-layer {
     position: absolute;
     inset: 0;
@@ -1248,6 +1258,12 @@
   function clearPress() {
     if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
   }
+
+  // Block iOS's native long-press image preview/context menu over photos
+  // so it doesn't fire alongside our long-press-to-edit gesture.
+  document.addEventListener("contextmenu", (e) => {
+    if (e.target.closest(".tile, .overlay-photo, .card")) e.preventDefault();
+  });
 
   document.addEventListener("pointerdown", (e) => {
     if (e.target.closest(".tile-hide-btn")) return;
