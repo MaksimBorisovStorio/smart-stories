@@ -91,23 +91,22 @@
   .view-stories .header {
     position: relative;
     z-index: 10;
-    flex: 0 0 auto;
-    height: 20vh;
-    min-height: 132px;
-    padding-top: env(safe-area-inset-top);
-    padding-bottom: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    padding-top: max(14px, env(safe-area-inset-top));
+    padding-bottom: 14px;
     text-align: center;
   }
   .view-stories .header h1 {
+    position: absolute;
+    top: max(calc(env(safe-area-inset-top) + 14px), 11vh);
+    left: 0;
+    right: 0;
     margin: 0;
     font-size: 22px;
     font-weight: 700;
     color: #fff;
     letter-spacing: 0.01em;
     text-shadow: 0 2px 12px rgba(0,0,0,0.18);
+    pointer-events: none;
   }
 
   .dots {
@@ -141,8 +140,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-top: 0;
-    padding-bottom: 80px;
+    margin-top: 8px;
+    padding-bottom: 140px;
   }
   .carousel {
     width: 100%;
