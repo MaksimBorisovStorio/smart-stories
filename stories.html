@@ -97,8 +97,34 @@
   }
   .view-stories .header h1 {
     margin: 8px 0 0;
-    font-size: 17px;
-    font-weight: 600;
+    font-size: 22px;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: 0.01em;
+    text-shadow: 0 2px 12px rgba(0,0,0,0.18);
+  }
+
+  .dots {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 56px;
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    z-index: 6;
+    pointer-events: none;
+  }
+  .dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.45);
+    transition: background 0.22s ease, transform 0.22s cubic-bezier(0.34, 1.4, 0.64, 1);
+  }
+  .dot.active {
+    background: #fff;
+    transform: scale(1.35);
   }
 
   /* Carousel */
@@ -551,6 +577,7 @@
   }
   .view-stories.exiting .header,
   .view-stories.exiting .carousel-wrap,
+  .view-stories.exiting .dots,
   .view-stories.exiting .tab-bar {
     transition: opacity 0.32s ease, transform 0.32s ease;
     opacity: 0;
@@ -596,6 +623,7 @@
   @media (prefers-reduced-motion: reduce) {
     .view-stories.exiting .header,
     .view-stories.exiting .carousel-wrap,
+    .view-stories.exiting .dots,
     .view-stories.exiting .tab-bar,
     .view-stories.exiting .card-bg-stack,
     .view-stories.exiting .card-bg.active,
@@ -879,10 +907,11 @@
       <div class="card-bg" id="bgB"></div>
     </div>
 
-    <div class="header"></div>
+    <div class="header"><h1>Smart Stories</h1></div>
 
     <div class="carousel-wrap">
       <div class="carousel" id="carousel"></div>
+      <div class="dots" id="dots"></div>
     </div>
 
     <nav class="tab-bar">
@@ -1013,6 +1042,13 @@
   }
 
   const cardEls = carousel.querySelectorAll(".card");
+  const dotsEl = document.getElementById("dots");
+  cards.forEach(() => {
+    const d = document.createElement("div");
+    d.className = "dot";
+    dotsEl.appendChild(d);
+  });
+  const dotEls = dotsEl.querySelectorAll(".dot");
   let lastActiveIdx = -1;
 
   function updateActiveCard() {
@@ -1029,6 +1065,7 @@
     });
     if (bestIdx !== lastActiveIdx) {
       cardEls.forEach((el, i) => el.classList.toggle("active", i === bestIdx));
+      dotEls.forEach((el, i) => el.classList.toggle("active", i === bestIdx));
       setBackground(cardEls[bestIdx].dataset.name);
       lastActiveIdx = bestIdx;
     }
