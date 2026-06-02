@@ -91,12 +91,12 @@
   .view-stories .header {
     position: relative;
     z-index: 10;
-    padding-top: max(14px, env(safe-area-inset-top));
-    padding-bottom: 14px;
+    padding-top: calc(env(safe-area-inset-top) + 56px);
+    padding-bottom: 28px;
     text-align: center;
   }
   .view-stories .header h1 {
-    margin: 8px 0 0;
+    margin: 0;
     font-size: 22px;
     font-weight: 700;
     color: #fff;
@@ -116,14 +116,14 @@
     pointer-events: none;
   }
   .dot {
-    width: 7px;
-    height: 7px;
+    width: 8px;
+    height: 8px;
     border-radius: 999px;
-    background: rgba(255,255,255,0.45);
+    background: rgba(0,0,0,0.22);
     transition: background 0.22s ease, transform 0.22s cubic-bezier(0.34, 1.4, 0.64, 1);
   }
   .dot.active {
-    background: #fff;
+    background: #1c1c1e;
     transform: scale(1.35);
   }
 
