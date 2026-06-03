@@ -315,34 +315,59 @@
 
   .app-nav {
     padding: 8px 16px 12px;
-    display: grid;
-    grid-template-columns: 40px 1fr 40px;
+    display: flex;
     align-items: center;
+    justify-content: space-between;
+    position: relative;
+    min-height: 48px;
   }
-  .app-nav .back, .app-nav .add {
+  .app-nav .back {
     width: 40px; height: 40px;
     display: flex; align-items: center; justify-content: center;
     color: var(--accent);
     cursor: pointer;
+    flex: 0 0 auto;
   }
-  .app-nav .add {
+  .edit-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 34px;
+    padding: 0 14px 0 12px;
+    background: rgba(31,122,107,0.10);
     border: none;
-    background: transparent;
-    padding: 0;
+    border-radius: 999px;
+    color: var(--accent);
     font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
     -webkit-tap-highlight-color: transparent;
+    white-space: nowrap;
+    flex: 0 0 auto;
+    transition: background 0.18s ease, color 0.18s ease;
   }
-  .app-nav .add[aria-pressed="true"] {
-    background: rgba(31,122,107,0.14);
-    border-radius: 50%;
+  .edit-btn:active { background: rgba(31,122,107,0.18); }
+  .edit-btn svg { display: block; }
+  .edit-btn[aria-pressed="true"] {
+    background: var(--accent);
+    color: #fff;
   }
 
   /* Hidden tile state (was: tile.style.display = "none";). */
   .tile.tile-hidden { display: none; }
   .app-nav .title {
-    text-align: center;
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
     font-size: 17px;
     font-weight: 600;
+    pointer-events: none;
+    white-space: nowrap;
+    max-width: calc(100% - 180px);
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .content { padding: 8px 18px 120px; }
@@ -1154,11 +1179,12 @@
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
         </a>
         <div class="title">Trip to Berlin 2026</div>
-        <button class="add" id="editToggleBtn" type="button" aria-label="Edit photos" aria-pressed="false">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <button class="edit-btn" id="editToggleBtn" type="button" aria-label="Edit photos" aria-pressed="false">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M12 20h9"/>
             <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
           </svg>
+          <span class="edit-btn-label">Edit</span>
         </button>
       </div>
     </div>
@@ -2409,10 +2435,12 @@
     e.stopPropagation();
     document.body.classList.toggle("edit-mode");
   });
+  const editToggleLabel = editToggleBtn.querySelector(".edit-btn-label");
   new MutationObserver(() => {
     const inEdit = document.body.classList.contains("edit-mode");
     editToggleBtn.setAttribute("aria-pressed", inEdit ? "true" : "false");
     editToggleBtn.setAttribute("aria-label", inEdit ? "Done editing" : "Edit photos");
+    if (editToggleLabel) editToggleLabel.textContent = inEdit ? "Done" : "Edit";
   }).observe(document.body, { attributes: true, attributeFilter: ["class"] });
 
   // Initial state — based on URL hash
