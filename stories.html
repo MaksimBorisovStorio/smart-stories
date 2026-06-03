@@ -994,6 +994,131 @@
   @media (prefers-reduced-motion: reduce) {
     .card, .bg-layer { transition: none !important; }
   }
+
+  /* Create bottom sheet */
+  .sheet-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15,15,15,0.45);
+    z-index: 200;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.28s ease;
+  }
+  .sheet-backdrop.open {
+    opacity: 1;
+    pointer-events: auto;
+    backdrop-filter: blur(6px) saturate(140%);
+    -webkit-backdrop-filter: blur(6px) saturate(140%);
+  }
+  .create-sheet {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 210;
+    background: #f6f6f7;
+    border-radius: 22px 22px 0 0;
+    padding: 10px 20px max(24px, env(safe-area-inset-bottom));
+    box-shadow: 0 -10px 40px rgba(0,0,0,0.22);
+    transform: translateY(100%);
+    transition: transform 0.36s cubic-bezier(0.32, 0.72, 0, 1);
+    will-change: transform;
+  }
+  .create-sheet.open { transform: translateY(0); }
+  @media (min-width: 481px) {
+    .create-sheet {
+      max-width: 414px;
+      left: 50%;
+      right: auto;
+      transform: translate(-50%, 100%);
+    }
+    .create-sheet.open { transform: translate(-50%, 0); }
+  }
+  .sheet-handle {
+    width: 36px;
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(60,60,67,0.3);
+    margin: 6px auto 14px;
+  }
+  .sheet-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 4px;
+  }
+  .sheet-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: #1a1a1a;
+    margin: 0;
+  }
+  .sheet-close {
+    width: 30px;
+    height: 30px;
+    background: rgba(0,0,0,0.06);
+    border: none;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #1a1a1a;
+    padding: 0;
+    cursor: pointer;
+    font-family: inherit;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .sheet-close:active { background: rgba(0,0,0,0.12); }
+  .sheet-close svg { display: block; }
+  .sheet-sub {
+    font-size: 13px;
+    color: #6a6a6e;
+    margin: 0 0 18px;
+  }
+  .sheet-options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 4px;
+  }
+  .sheet-option {
+    background: #fff;
+    border: 1px solid rgba(0,0,0,0.06);
+    border-radius: 16px;
+    padding: 18px 12px 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    color: #1a1a1a;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: transform 0.15s ease, background 0.2s ease;
+  }
+  .sheet-option:active {
+    transform: scale(0.97);
+    background: #f1f1f1;
+  }
+  .sheet-option-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(31,122,107,0.10);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #1f7a6b;
+  }
+  .sheet-option-icon svg { display: block; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .create-sheet,
+    .sheet-backdrop { transition: opacity 0.2s ease; }
+  }
 </style>
 </head>
 <body>
@@ -1050,13 +1175,70 @@
   </div>
 
   <div class="fab-bar">
-    <button class="fab-btn primary" id="createProductBtn" type="button" aria-label="Create photo book">
+    <button class="fab-btn primary" id="createProductBtn" type="button" aria-label="Create">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
         <path d="M11 13H6C5.71667 13 5.47917 12.9042 5.2875 12.7125C5.09583 12.5208 5 12.2833 5 12C5 11.7167 5.09583 11.4792 5.2875 11.2875C5.47917 11.0958 5.71667 11 6 11H11V6C11 5.71667 11.0958 5.47917 11.2875 5.2875C11.4792 5.09583 11.7167 5 12 5C12.2833 5 12.5208 5.09583 12.7125 5.2875C12.9042 5.47917 13 5.71667 13 6V11H18C18.2833 11 18.5208 11.0958 18.7125 11.2875C18.9042 11.4792 19 11.7167 19 12C19 12.2833 18.9042 12.5208 18.7125 12.7125C18.5208 12.9042 18.2833 13 18 13H13V18C13 18.2833 12.9042 18.5208 12.7125 18.7125C12.5208 18.9042 12.2833 19 12 19C11.7167 19 11.4792 18.9042 11.2875 18.7125C11.0958 18.5208 11 18.2833 11 18V13Z"/>
       </svg>
       <span>Create</span>
     </button>
   </div>
+
+  <div class="sheet-backdrop" id="createSheetBackdrop"></div>
+  <aside class="create-sheet" id="createSheet" role="dialog" aria-modal="true" aria-labelledby="createSheetTitle" aria-hidden="true">
+    <div class="sheet-handle" aria-hidden="true"></div>
+    <div class="sheet-header">
+      <h3 class="sheet-title" id="createSheetTitle">Create</h3>
+      <button class="sheet-close" id="createSheetClose" type="button" aria-label="Close">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <line x1="6" y1="6" x2="18" y2="18"/>
+          <line x1="6" y1="18" x2="18" y2="6"/>
+        </svg>
+      </button>
+    </div>
+    <p class="sheet-sub">The next step — choose product options</p>
+    <div class="sheet-options">
+      <button class="sheet-option" type="button">
+        <span class="sheet-option-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v18H6.5a2.5 2.5 0 0 0 0 5H20"/>
+            <line x1="9" y1="7" x2="16" y2="7"/>
+            <line x1="9" y1="11" x2="14" y2="11"/>
+          </svg>
+        </span>
+        <span>Photo book</span>
+      </button>
+      <button class="sheet-option" type="button">
+        <span class="sheet-option-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="5" width="18" height="16" rx="2"/>
+            <line x1="3" y1="10" x2="21" y2="10"/>
+            <line x1="8" y1="3" x2="8" y2="7"/>
+            <line x1="16" y1="3" x2="16" y2="7"/>
+          </svg>
+        </span>
+        <span>Calendar</span>
+      </button>
+      <button class="sheet-option" type="button">
+        <span class="sheet-option-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="3" width="18" height="18" rx="2"/>
+            <circle cx="9" cy="9" r="2"/>
+            <path d="M21 16l-5-5L5 21"/>
+          </svg>
+        </span>
+        <span>Wall decor</span>
+      </button>
+      <button class="sheet-option" type="button">
+        <span class="sheet-option-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="7" width="14" height="14" rx="2"/>
+            <path d="M7 7V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v12"/>
+          </svg>
+        </span>
+        <span>Photo prints</span>
+      </button>
+    </div>
+  </aside>
 
   <div class="overlay" id="overlay" aria-hidden="true">
     <div class="overlay-inner">
@@ -2180,6 +2362,50 @@
     e.preventDefault();
     e.stopPropagation();
     document.body.classList.remove("edit-mode");
+  });
+
+  // Create bottom sheet
+  const createBtn = document.getElementById("createProductBtn");
+  const createSheet = document.getElementById("createSheet");
+  const createSheetBackdrop = document.getElementById("createSheetBackdrop");
+  const createSheetClose = document.getElementById("createSheetClose");
+
+  function openCreateSheet() {
+    createSheet.classList.add("open");
+    createSheetBackdrop.classList.add("open");
+    createSheet.setAttribute("aria-hidden", "false");
+    document.body.style.overflow = "hidden";
+  }
+  function closeCreateSheet() {
+    createSheet.classList.remove("open");
+    createSheetBackdrop.classList.remove("open");
+    createSheet.setAttribute("aria-hidden", "true");
+    document.body.style.overflow = "";
+  }
+
+  createBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    openCreateSheet();
+  });
+  createSheetClose.addEventListener("click", (e) => {
+    e.stopPropagation();
+    closeCreateSheet();
+  });
+  createSheetBackdrop.addEventListener("click", (e) => {
+    e.stopPropagation();
+    closeCreateSheet();
+  });
+  createSheet.querySelectorAll(".sheet-option").forEach((opt) => {
+    opt.addEventListener("click", (e) => {
+      e.stopPropagation();
+      closeCreateSheet();
+    });
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && createSheet.classList.contains("open")) {
+      closeCreateSheet();
+    }
   });
 
   // Toggle "show hidden" mode in the album header. Tapping the eye toggles
