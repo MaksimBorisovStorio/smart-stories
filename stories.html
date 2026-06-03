@@ -352,6 +352,102 @@
 
   .content { padding: 8px 18px 120px; }
 
+  /* Hint carousel banner (welcome + tips) */
+  .hints-banner {
+    margin: 6px 0 18px;
+    position: relative;
+  }
+  .hints-banner.hint-dismissed { display: none; }
+
+  .hint-track {
+    display: flex;
+    overflow-x: auto;
+    overflow-y: visible;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: 12px;
+    scroll-behavior: smooth;
+  }
+  .hint-track::-webkit-scrollbar { display: none; }
+  @media (prefers-reduced-motion: reduce) {
+    .hint-track { scroll-behavior: auto; }
+  }
+
+  .hint {
+    flex: 0 0 100%;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+    box-sizing: border-box;
+    background: #ece6d8;
+    border-radius: 16px;
+    padding: 18px 50px 18px 18px;
+    position: relative;
+    text-align: left;
+    min-height: 108px;
+  }
+
+  .hint-close {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 32px;
+    height: 32px;
+    background: transparent;
+    border: none;
+    border-radius: 50%;
+    padding: 0;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #1a1a1a;
+    font-family: inherit;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .hint-close:active { background: rgba(0,0,0,0.06); }
+  .hint-close svg { display: block; }
+
+  .hint-title {
+    font-size: 15px;
+    font-weight: 700;
+    margin: 0 0 8px;
+    color: #1a1a1a;
+    line-height: 1.25;
+  }
+
+  .hint-body {
+    font-size: 13px;
+    line-height: 1.45;
+    color: #4a4a4a;
+    margin: 0;
+  }
+
+  .hint-dots {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    margin-top: 12px;
+  }
+  .hint-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #cdc8be;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.2s ease;
+  }
+  .hint-dot.active {
+    background: #1a1a1a;
+    transform: scale(1.15);
+  }
+
+  .view-album.entering .hints-banner {
+    animation: album-enter-chapter 0.55s 0.12s cubic-bezier(0.34, 1.35, 0.64, 1) both;
+  }
+
   .chapter { margin: 28px 0 36px; text-align: center; }
   .chapter-title { font-size: 18px; font-weight: 700; margin: 0 0 4px; }
   .chapter-meta { font-size: 13px; color: var(--muted); margin-bottom: 18px; }
@@ -1328,6 +1424,44 @@
   }
 
   const root = document.getElementById("content");
+
+  const hintCloseIconSVG = `
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <line x1="6" y1="6" x2="18" y2="18"/>
+      <line x1="6" y1="18" x2="18" y2="6"/>
+    </svg>`;
+  const hintData = [
+    {
+      title: "Welcome to Smart Stories!",
+      body: "We automatically sort all your photos, group duplicates and hide screenshots. Review the album to continue.",
+    },
+    {
+      title: "Long-press to edit",
+      body: "Press and hold any photo to enter edit mode — then tap the red button to hide it from the story.",
+    },
+    {
+      title: "Bring back hidden photos",
+      body: "Tap the eye icon in the header any time to reveal photos you've hidden so you can put them back.",
+    },
+  ];
+  const hintsHTML = `
+    <div class="hints-banner" id="hintsBanner">
+      <div class="hint-track" id="hintTrack">
+        ${hintData.map(h => `
+          <article class="hint">
+            <button class="hint-close" type="button" aria-label="Dismiss hints">${hintCloseIconSVG}</button>
+            <h3 class="hint-title">${h.title}</h3>
+            <p class="hint-body">${h.body}</p>
+          </article>
+        `).join("")}
+      </div>
+      <div class="hint-dots" id="hintDots">
+        ${hintData.map((_, i) => `<button class="hint-dot${i === 0 ? " active" : ""}" type="button" aria-label="Go to hint ${i+1}" data-idx="${i}"></button>`).join("")}
+      </div>
+    </div>
+  `;
+  root.insertAdjacentHTML("beforeend", hintsHTML);
+
   let tileIdx = 0;
   chapters.forEach((ch, ci) => {
     const cls = gridClass(ch.tiles.length);
@@ -1350,6 +1484,106 @@
   });
 
   refreshChapterCounts();
+
+  // Hints carousel: auto-advance, dot sync, dismiss
+  (function setupHints() {
+    const banner = document.getElementById("hintsBanner");
+    if (!banner) return;
+    const track = banner.querySelector(".hint-track");
+    const hints = Array.from(banner.querySelectorAll(".hint"));
+    const dots = Array.from(banner.querySelectorAll(".hint-dot"));
+    const closeBtns = banner.querySelectorAll(".hint-close");
+    const INTERVAL_MS = 7000;
+    const RESUME_AFTER_MS = 15000;
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let currentIdx = 0;
+    let autoTimer = null;
+    let pauseTimer = null;
+    let scrollRAF = null;
+
+    function goTo(idx, smooth) {
+      const target = hints[idx];
+      if (!target) return;
+      const left = target.offsetLeft - track.offsetLeft;
+      if (typeof track.scrollTo === "function") {
+        track.scrollTo({ left, behavior: smooth && !reduceMotion ? "smooth" : "auto" });
+      } else {
+        track.scrollLeft = left;
+      }
+    }
+
+    function updateActive() {
+      const trackLeft = track.scrollLeft;
+      let bestIdx = 0;
+      let bestDist = Infinity;
+      hints.forEach((h, i) => {
+        const dist = Math.abs((h.offsetLeft - track.offsetLeft) - trackLeft);
+        if (dist < bestDist) { bestDist = dist; bestIdx = i; }
+      });
+      if (bestIdx !== currentIdx) {
+        currentIdx = bestIdx;
+        dots.forEach((d, i) => d.classList.toggle("active", i === currentIdx));
+      }
+    }
+
+    function startAuto() {
+      stopAuto();
+      autoTimer = setInterval(() => {
+        const next = (currentIdx + 1) % hints.length;
+        goTo(next, true);
+      }, INTERVAL_MS);
+    }
+    function stopAuto() {
+      if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+    }
+    function pauseFor(ms) {
+      stopAuto();
+      if (pauseTimer) clearTimeout(pauseTimer);
+      pauseTimer = setTimeout(() => {
+        pauseTimer = null;
+        if (!banner.classList.contains("hint-dismissed")) startAuto();
+      }, ms);
+    }
+
+    track.addEventListener("scroll", () => {
+      if (scrollRAF) return;
+      scrollRAF = requestAnimationFrame(() => {
+        scrollRAF = null;
+        updateActive();
+      });
+    }, { passive: true });
+
+    track.addEventListener("pointerdown", () => pauseFor(RESUME_AFTER_MS));
+    track.addEventListener("wheel", () => pauseFor(RESUME_AFTER_MS), { passive: true });
+
+    dots.forEach((d) => {
+      d.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const idx = parseInt(d.dataset.idx, 10);
+        if (!Number.isNaN(idx)) {
+          goTo(idx, true);
+          pauseFor(RESUME_AFTER_MS);
+        }
+      });
+    });
+
+    closeBtns.forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        banner.classList.add("hint-dismissed");
+        stopAuto();
+        if (pauseTimer) { clearTimeout(pauseTimer); pauseTimer = null; }
+      });
+    });
+
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) stopAuto();
+      else if (!banner.classList.contains("hint-dismissed") && !pauseTimer) startAuto();
+    });
+
+    updateActive();
+    startAuto();
+  })();
 
   // Lightbox overlay
   const overlay = document.getElementById("overlay");
